@@ -221,7 +221,7 @@
           }
           case TG.EventType.State.NotReady: {
             console.log("[HTML] 状態: 未認証");
-            console.log("[HTML] Platform not ready, attempting sign-in...");
+            console.log("[HTML] サインインが必要です");
             // State.NotReadyの場合はサインインを実行
             if (window.TG_featureAccountSignIn) {
               setTimeout(() => {
@@ -241,9 +241,9 @@
               console.log("[HTML]   UID:", value.uid);
               console.log("[HTML]   表示名:", value.display_name);
               
-              // アカウントデータを受信したらUnityに送信
+              // アカウントデータを受信したらUnityに送信してゲーム開始
               if (unityInstance && value.display_name) {
-                console.log("[HTML] Real server account data detected, sending to Unity");
+                console.log("[HTML] ユーザー情報取得成功 - ゲーム開始準備完了");
                 const jsonResponse = JSON.stringify(d);
                 console.log("[HTML] Sending REAL account data to Unity:", jsonResponse);
                 unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
@@ -252,6 +252,7 @@
             } else {
               console.log("[HTML] アカウント取得失敗");
               console.log("[HTML]   エラー:", value ? value.message : '不明なエラー');
+              console.log("[HTML] サインインが必要です");
             }
             break;
           }
@@ -315,14 +316,14 @@
       console.log("[HTML] iframe通信初期化完了");
       console.log("[HTML] 親ウィンドウ存在確認:", window.parent !== window);
       
-      // ページ読み込み完了後、サインイン状態を確認するためにサインインを実行
-      console.log("[HTML] Initiating sign-in process on page load");
+      // ページ読み込み完了後、まずユーザー情報を取得を試行
+      console.log("[HTML] Initiating account data retrieval on page load");
       setTimeout(() => {
-        if (window.TG_featureAccountSignIn) {
-          console.log("[HTML] Executing initial TG_featureAccountSignIn");
-          window.TG_featureAccountSignIn();
+        if (window.TG_featureAccountGet) {
+          console.log("[HTML] Executing initial TG_featureAccountGet");
+          window.TG_featureAccountGet();
         } else {
-          console.error("[HTML] TG_featureAccountSignIn not available on page load");
+          console.error("[HTML] TG_featureAccountGet not available on page load");
         }
       }, 1000); // Unity初期化を待ってから実行
     });
