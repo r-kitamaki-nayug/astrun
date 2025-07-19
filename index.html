@@ -174,10 +174,20 @@
       if (useRealServer) {
         const request = TG.featureRankingPost({ score: Number(score) });
         console.log("[HTML] Ranking post request:", request);
+        console.log("[HTML] === スコア送信データ詳細 ===");
+        console.log("[HTML] - スコア値:", score);
+        console.log("[HTML] - 数値変換後:", Number(score));
+        console.log("[HTML] - リクエストID:", request.id);
+        console.log("[HTML] - リクエストタイプ:", request.type);
+        console.log("[HTML] - コマンド:", request.data.command);
+        console.log("[HTML] - 送信値:", request.data.value);
+        console.log("[HTML] === スコア送信データ詳細終了 ===");
         
         if (window.parent && window.parent !== window) {
+          console.log("[HTML] 親ウィンドウにスコア送信リクエストを送信");
           window.parent.postMessage(request, "*");
         } else {
+          console.log("[HTML] 同一ウィンドウにスコア送信リクエストを送信");
           window.postMessage(request, "*");
         }
       } else {
@@ -253,6 +263,13 @@
           case TG.EventType.Ranking.Post: {
             const value = d.data.value;
             console.log("[HTML] ランキング投稿結果:", value);
+            console.log("[HTML] === スコア投稿結果詳細 ===");
+            console.log("[HTML] - 結果:", value.result);
+            console.log("[HTML] - メッセージ:", value.message);
+            console.log("[HTML] - 送信されたスコア:", value.score);
+            console.log("[HTML] - 獲得順位:", value.rank);
+            console.log("[HTML] - 投稿日時:", value.submitted_at);
+            console.log("[HTML] === スコア投稿結果詳細終了 ===");
             
             // Unityにスコア投稿結果を通知
             if (unityInstance) {
@@ -265,6 +282,14 @@
           case TG.EventType.Ranking.GetMy: {
             const value = d.data.value;
             console.log("[HTML] 自分のハイスコア取得結果:", value);
+            console.log("[HTML] === ハイスコア取得データ詳細 ===");
+            console.log("[HTML] - 結果:", value.result);
+            console.log("[HTML] - スコア値:", value.score);
+            console.log("[HTML] - 順位:", value.rank);
+            console.log("[HTML] - 更新日時:", value.updated_at);
+            console.log("[HTML] - ユーザーID:", value.uid);
+            console.log("[HTML] - 表示名:", value.display_name);
+            console.log("[HTML] === ハイスコア取得データ詳細終了 ===");
             
             // Unityにハイスコア取得結果を通知
             if (unityInstance) {
