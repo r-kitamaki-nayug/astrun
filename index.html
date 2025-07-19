@@ -71,11 +71,13 @@
         // 実際のサーバー通信を実行
         try {
           console.log("[HTML] 実際のサーバーにリクエストを送信中...");
+          console.log("[HTML] リクエスト詳細:", JSON.stringify(request, null, 2));
           window.postMessage(request, "*");
           
           // サーバーからの応答を待機（タイムアウト設定）
           setTimeout(() => {
             console.log("[HTML] サーバー応答タイムアウト - モックレスポンスにフォールバック");
+            console.log("[HTML] タイムアウト理由: サーバー側のTypeScriptコードが応答を処理していない可能性");
             if (unityInstance) {
               const mockResponse = {
                 "id": 2,
@@ -170,26 +172,77 @@
       window.postMessage(request, "*");
     };
 
-    // メッセージ受信処理を改善
+    // メッセージ受信処理を改善（開発者提案のイベントリスナーを追加）
     window.addEventListener("message", (e) => {
       console.log("[HTML] REAL server message received:", e.data);
+      
+      // 開発者提案の形式でデータを処理
+      const d = e.data;
+      if (d && d.type == TG.Type.Event) {
+        // プラットフォームから取得したイベントをログに書き出す
+        console.log("[Game]", "Received data from platform:", d);
+        
+        switch (d.data.command) {
+          case TG.EventType.State.Ready: {
+            console.log("Authenticated account data received.");
+            // State.Readyが受信されたら自動でアカウント取得を実行
+            console.log("[HTML] Platform is ready, requesting account data...");
+            if (window.TG_featureAccountGet) {
+              setTimeout(() => {
+                window.TG_featureAccountGet();
+              }, 100); // 少し遅延を入れて確実に実行
+            }
+            break;
+          }
+          case TG.EventType.State.NotReady: {
+            console.warn("No authenticated account data received.");
+            break;
+          }
+          case TG.EventType.Account.Get: {
+            console.log("[Game] Account data received:", d.data.value);
+            // アカウントデータを受信したらUnityに送信
+            if (unityInstance && d.data.value && d.data.value.display_name) {
+              const jsonResponse = JSON.stringify(d);
+              console.log("[HTML] Sending account data to Unity:", jsonResponse);
+              unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+            }
+            break;
+          }
+          default: {
+            console.log("[Game] Other event received:", d.data.command);
+            break;
+          }
+        }
+      }
+      
+      // 既存の処理も維持（後方互換性のため）
+      // サーバー側のTypeScriptコードとの競合を避けるため、データを詳細にログ出力
+      console.log("[HTML] Message type:", typeof e.data);
+      console.log("[HTML] Message structure:", JSON.stringify(e.data, null, 2));
+      
       const json = JSON.stringify(e.data);
       console.log("[HTML] Real server JSON stringified:", json);
       
-      if (unityInstance) {
-        console.log("[HTML] Sending REAL server message to Unity");
-        unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
+      // Unityに送信する前にデータ形式を確認
+      if (e.data && e.data.type && e.data.data) {
+        console.log("[HTML] Valid message structure detected");
+        if (unityInstance) {
+          console.log("[HTML] Sending REAL server message to Unity");
+          unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
+        } else {
+          console.warn("[HTML] Unity instance not ready yet, real server message queued");
+          // Unityが準備できていない場合は少し待ってから再試行
+          setTimeout(() => {
+            if (unityInstance) {
+              console.log("[HTML] Retrying to send REAL server message to Unity");
+              unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
+            } else {
+              console.error("[HTML] Unity instance still not ready after retry");
+            }
+          }, 1000);
+        }
       } else {
-        console.warn("[HTML] Unity instance not ready yet, real server message queued");
-        // Unityが準備できていない場合は少し待ってから再試行
-        setTimeout(() => {
-          if (unityInstance) {
-            console.log("[HTML] Retrying to send REAL server message to Unity");
-            unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
-          } else {
-            console.error("[HTML] Unity instance still not ready after retry");
-          }
-        }, 1000);
+        console.warn("[HTML] Invalid message structure, skipping Unity transmission");
       }
     });
 
