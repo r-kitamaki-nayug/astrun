@@ -56,6 +56,16 @@
       try {
         const request = TG.featureAccountGet();
         log(`リクエストデータ: ${JSON.stringify(request, null, 2)}`);
+        
+        // iframe内から親ウィンドウにメッセージを送信
+        if (window.parent && window.parent !== window) {
+          log("iframe内から親ウィンドウにメッセージ送信");
+          window.parent.postMessage(request, "*");
+        } else {
+          log("通常のウィンドウ - 自分自身にメッセージ送信");
+          window.postMessage(request, "*");
+        }
+        
         showStatus("アカウント情報取得リクエストを送信しました");
       } catch (error) {
         log(`エラー: ${error.message}`);
@@ -70,6 +80,16 @@
       try {
         const request = TG.featureAccountSignIn();
         log(`リクエストデータ: ${JSON.stringify(request, null, 2)}`);
+        
+        // iframe内から親ウィンドウにメッセージを送信
+        if (window.parent && window.parent !== window) {
+          log("iframe内から親ウィンドウにメッセージ送信");
+          window.parent.postMessage(request, "*");
+        } else {
+          log("通常のウィンドウ - 自分自身にメッセージ送信");
+          window.postMessage(request, "*");
+        }
+        
         showStatus("サインインリクエストを送信しました");
       } catch (error) {
         log(`エラー: ${error.message}`);
