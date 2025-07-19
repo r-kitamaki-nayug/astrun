@@ -196,6 +196,16 @@
           }
           case TG.EventType.State.NotReady: {
             console.warn("No authenticated account data received.");
+            console.log("[HTML] Platform not ready, attempting sign-in...");
+            // State.NotReadyの場合はサインインを実行
+            if (window.TG_featureAccountSignIn) {
+              setTimeout(() => {
+                console.log("[HTML] Executing TG_featureAccountSignIn");
+                window.TG_featureAccountSignIn();
+              }, 100);
+            } else {
+              console.error("[HTML] TG_featureAccountSignIn function not found");
+            }
             return; // 処理完了
           }
           case TG.EventType.Account.Get: {
@@ -267,6 +277,17 @@
         featureRankingGetMy: typeof window.TG_featureRankingGetMy,
         featureRankingPost: typeof window.TG_featureRankingPost
       });
+      
+      // ページ読み込み完了後、サインイン状態を確認するためにサインインを実行
+      console.log("[HTML] Initiating sign-in process on page load");
+      setTimeout(() => {
+        if (window.TG_featureAccountSignIn) {
+          console.log("[HTML] Executing initial TG_featureAccountSignIn");
+          window.TG_featureAccountSignIn();
+        } else {
+          console.error("[HTML] TG_featureAccountSignIn not available on page load");
+        }
+      }, 1000); // Unity初期化を待ってから実行
     });
   </script>
 </body>
