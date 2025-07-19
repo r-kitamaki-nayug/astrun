@@ -315,6 +315,14 @@
           console.log("[HTML] [MOCK] モックモードでログインフローを開始");
         }
         initiateLoginFlow();
+        
+        // ローカルモックの場合、2秒後にハイスコア取得もトリガー
+        if (!useRealServer) {
+          setTimeout(() => {
+            console.log("[HTML] [MOCK] ハイスコア取得を自動実行");
+            window.TG_featureRankingGetMy();
+          }, 2000);
+        }
       }, 1000); // Unity初期化を待つ
     });
     
