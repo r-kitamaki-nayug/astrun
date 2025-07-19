@@ -74,27 +74,27 @@
           console.log("[HTML] リクエスト詳細:", JSON.stringify(request, null, 2));
           window.postMessage(request, "*");
           
-          // サーバーからの応答を待機（タイムアウト設定）
-          setTimeout(() => {
-            console.log("[HTML] サーバー応答タイムアウト - モックレスポンスにフォールバック");
-            console.log("[HTML] タイムアウト理由: サーバー側のTypeScriptコードが応答を処理していない可能性");
-            if (unityInstance) {
-              const mockResponse = {
-                "id": 2,
-                "type": "event",
-                "data": {
-                  "command": "account-get",
-                  "result": true,
-                  "value": {
-                    "uid": "real_user_123",
-                    "display_name": "テストユーザー(タイムアウト)"
-                  }
-                }
-              };
-              const jsonResponse = JSON.stringify(mockResponse);
-              unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
-            }
-          }, 5000); // 5秒でタイムアウト
+          // タイムアウト処理を無効化（実サーバー応答を優先）
+          // setTimeout(() => {
+          //   console.log("[HTML] サーバー応答タイムアウト - モックレスポンスにフォールバック");
+          //   console.log("[HTML] タイムアウト理由: サーバー側のTypeScriptコードが応答を処理していない可能性");
+          //   if (unityInstance) {
+          //     const mockResponse = {
+          //       "id": 2,
+          //       "type": "event",
+          //       "data": {
+          //         "command": "account-get",
+          //         "result": true,
+          //         "value": {
+          //           "uid": "real_user_123",
+          //           "display_name": "テストユーザー(タイムアウト)"
+          //         }
+          //       }
+          //     };
+          //     const jsonResponse = JSON.stringify(mockResponse);
+          //     unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+          //   }
+          // }, 5000); // タイムアウトを無効化
           
         } catch (error) {
           console.error("[HTML] サーバー通信エラー:", error);
@@ -192,19 +192,22 @@
                 window.TG_featureAccountGet();
               }, 100); // 少し遅延を入れて確実に実行
             }
-            break;
+            return; // 処理完了
           }
           case TG.EventType.State.NotReady: {
             console.warn("No authenticated account data received.");
-            break;
+            return; // 処理完了
           }
           case TG.EventType.Account.Get: {
             console.log("[Game] Account data received:", d.data.value);
             // アカウントデータを受信したらUnityに送信
             if (unityInstance && d.data.value && d.data.value.display_name) {
+              console.log("[HTML] Real server account data detected, sending to Unity");
+              console.log("[HTML] Display name:", d.data.value.display_name);
               const jsonResponse = JSON.stringify(d);
-              console.log("[HTML] Sending account data to Unity:", jsonResponse);
+              console.log("[HTML] Sending REAL account data to Unity:", jsonResponse);
               unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+              return; // 処理完了なので後続処理をスキップ
             }
             break;
           }
@@ -213,6 +216,10 @@
             break;
           }
         }
+        
+        // 実サーバーからの正しい応答なので、後続の既存処理はスキップ
+        console.log("[HTML] Real server response processed, skipping legacy handling");
+        return;
       }
       
       // 既存の処理も維持（後方互換性のため）
