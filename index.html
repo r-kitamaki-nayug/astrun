@@ -47,11 +47,32 @@
     console.log("[HTML] TG module loaded:", TG);
 
     // サーバー通信フラグ
-    let useRealServer = true; // trueにすると実際のサーバー通信
+    let useRealServer = true; // trueにすると実際のサーバー通信、falseでローカルモック
+    
+    // ローカルテスト用モックデータ
+    const mockUserData = {
+      uid: "local_test_user_123",
+      display_name: "テストユーザー（ローカル）",
+      result: true
+    };
+    
+    // モックレスポンス生成
+    function createMockResponse(command, success = true, data = null) {
+      return {
+        id: Date.now(),
+        type: TG.Type.Event,
+        data: {
+          command: command,
+          result: success,
+          value: data || mockUserData
+        }
+      };
+    }
 
     // アカウント情報取得
     window.TG_featureAccountGet = () => {
       console.log("[HTML] TG_featureAccountGet called");
+      console.log("[HTML] Mode:", useRealServer ? "Real Server" : "Local Mock");
       
       if (useRealServer) {
         const request = TG.featureAccountGet();
@@ -63,20 +84,40 @@
         } else {
           window.postMessage(request, "*");
         }
+      } else {
+        // ローカルモック: アカウント取得成功をシミュレート
+        console.log("[HTML] [MOCK] アカウント取得をシミュレート");
+        setTimeout(() => {
+          const mockResponse = createMockResponse(TG.EventType.Account.Get, true, mockUserData);
+          console.log("[HTML] [MOCK] アカウント取得成功:", mockResponse);
+          window.dispatchEvent(new MessageEvent('message', { data: mockResponse }));
+        }, 500); // 0.5秒後にレスポンス
       }
     };
 
     // サインイン（手動実行のみ）
     window.TG_featureAccountSignIn = () => {
       console.log("[HTML] TG_featureAccountSignIn called");
-      const request = TG.featureAccountSignIn();
-      console.log("[HTML] SignIn request:", request);
+      console.log("[HTML] Mode:", useRealServer ? "Real Server" : "Local Mock");
       
-      // iframe内から親ウィンドウにメッセージを送信
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(request, "*");
+      if (useRealServer) {
+        const request = TG.featureAccountSignIn();
+        console.log("[HTML] SignIn request:", request);
+        
+        // iframe内から親ウィンドウにメッセージを送信
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(request, "*");
+        } else {
+          window.postMessage(request, "*");
+        }
       } else {
-        window.postMessage(request, "*");
+        // ローカルモック: サインイン成功をシミュレート
+        console.log("[HTML] [MOCK] サインインをシミュレート");
+        setTimeout(() => {
+          const readyResponse = createMockResponse(TG.EventType.State.Ready, true);
+          console.log("[HTML] [MOCK] サインイン成功 - State.Ready:", readyResponse);
+          window.dispatchEvent(new MessageEvent('message', { data: readyResponse }));
+        }, 1000); // 1秒後にState.Ready
       }
     };
 
@@ -115,7 +156,7 @@
       }
     };
 
-    // メッセージ受信処理
+    // メッセージ受信処理（ログインフロー対応版）
     window.addEventListener("message", (e) => {
       console.log("[HTML] サーバーからのレスポンス:", e.data);
       
@@ -124,26 +165,49 @@
         switch (d.data.command) {
           case TG.EventType.State.Ready: {
             console.log("[HTML] プラットフォーム準備完了");
-            // 準備完了時は何もしない（Unity側で必要に応じてアカウント取得）
+            // State.Readyの場合、ログイン処理後なのでユーザー情報を再取得
+            if (!isLoggedIn) {
+              console.log("[HTML] ログイン完了後、ユーザー情報を再取得");
+              retryGetUserInfo();
+            }
             return;
           }
           case TG.EventType.State.NotReady: {
-            console.log("[HTML] プラットフォーム未準備 - サインインが必要");
-            // 自動サインインは実行しない（手動実行のみ）
+            console.log("[HTML] プラットフォーム未準備 - ログインが必要");
+            if (!isLoggedIn) {
+              // 未ログイン状態なのでログインを実行
+              performLogin();
+            }
             return;
           }
           case TG.EventType.Account.Get: {
             const value = d.data.value;
-            if (value && value.result) {
-              console.log("[HTML] アカウント取得成功:", value.display_name);
+            if (value && value.result && value.display_name) {
+              // ユーザー情報取得成功
+              console.log("[HTML] ✓ ログイン成功:", value.display_name);
+              isLoggedIn = true;
+              userInfo = value;
               
-              // Unityにアカウントデータを送信
+              // Unityにログイン成功を通知
+              notifyUnityLoginStatus(true, value);
+              
+              // 元のフォーマットでもUnityに送信（既存の処理との互換性）
               if (unityInstance) {
                 const jsonResponse = JSON.stringify(d);
                 unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
               }
             } else {
-              console.log("[HTML] アカウント取得失敗");
+              // ユーザー情報取得失敗
+              console.log("[HTML] ✗ ユーザー情報取得失敗 - ログインが必要");
+              if (!isLoggedIn) {
+                performLogin();
+              } else {
+                // ログインしたはずなのに失敗した場合
+                console.error("[HTML] ログイン後もユーザー情報取得に失敗");
+                isLoggedIn = false;
+                userInfo = null;
+                notifyUnityLoginStatus(false);
+              }
             }
             return;
           }
@@ -162,14 +226,79 @@
       console.error("[HTML] JavaScript error:", e.error);
     });
 
-    // 初期化
+    // 環境検出（ローカル環境の場合は自動でモックモードに）
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '') {
+      useRealServer = false;
+      console.log("[HTML] === ローカル環境検出 - モックモードに自動切り替え ===");
+    } else {
+      console.log("[HTML] === 本番環境検出 - 実サーバーモード ===");
+    }
+    
+    // ログイン状態管理
+    let isLoggedIn = false;
+    let userInfo = null;
+    
+    // 初期化とログインフロー開始
     window.addEventListener("load", () => {
       console.log("[HTML] Page loaded, iframe通信準備完了");
+      console.log("[HTML] 動作モード:", useRealServer ? "実サーバー" : "ローカルモック");
       console.log("[HTML] 親ウィンドウ存在:", window.parent !== window);
+      console.log("[HTML] 現在のURL:", window.location.href);
       
-      // Unity側で必要に応じてアカウント取得を実行するため、
-      // ここでは自動実行しない
+      // ページ読み込み後、自動でログインフローを開始
+      setTimeout(() => {
+        console.log("[HTML] === ログインフロー開始 ===");
+        if (!useRealServer) {
+          console.log("[HTML] [MOCK] モックモードでログインフローを開始");
+        }
+        initiateLoginFlow();
+      }, 1000); // Unity初期化を待つ
     });
+    
+    // ログインフローの実行
+    function initiateLoginFlow() {
+      console.log("[HTML] Step 1: ユーザー情報を取得中...");
+      
+      // まずユーザー情報を取得してみる
+      if (window.TG_featureAccountGet) {
+        window.TG_featureAccountGet();
+      } else {
+        console.error("[HTML] TG_featureAccountGet not available");
+      }
+    }
+    
+    // ログインが必要な場合の処理
+    function performLogin() {
+      console.log("[HTML] Step 2: ログインを実行中...");
+      
+      if (window.TG_featureAccountSignIn) {
+        window.TG_featureAccountSignIn();
+      } else {
+        console.error("[HTML] TG_featureAccountSignIn not available");
+      }
+    }
+    
+    // ログイン後の再取得
+    function retryGetUserInfo() {
+      console.log("[HTML] Step 3: ログイン後にユーザー情報を再取得中...");
+      
+      if (window.TG_featureAccountGet) {
+        window.TG_featureAccountGet();
+      }
+    }
+    
+    // Unityにログイン状態を通知
+    function notifyUnityLoginStatus(loggedIn, userData = null) {
+      if (unityInstance) {
+        const loginStatus = {
+          isLoggedIn: loggedIn,
+          userData: userData
+        };
+        
+        console.log("[HTML] Unityにログイン状態を通知:", loginStatus);
+        unityInstance.SendMessage("GamePlatform", "OnLoginStatusChanged", JSON.stringify(loginStatus));
+      }
+    }
   </script>
 </body>
 </html>
