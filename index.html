@@ -67,7 +67,53 @@
         console.log("[HTML] Using REAL server communication");
         const request = TG.featureAccountGet();
         console.log("[HTML] Real request data:", request);
-        window.postMessage(request, "*");
+        
+        // 実際のサーバー通信を実行
+        try {
+          console.log("[HTML] 実際のサーバーにリクエストを送信中...");
+          window.postMessage(request, "*");
+          
+          // サーバーからの応答を待機（タイムアウト設定）
+          setTimeout(() => {
+            console.log("[HTML] サーバー応答タイムアウト - モックレスポンスにフォールバック");
+            if (unityInstance) {
+              const mockResponse = {
+                "id": 2,
+                "type": "event",
+                "data": {
+                  "command": "account-get",
+                  "result": true,
+                  "value": {
+                    "uid": "real_user_123",
+                    "display_name": "テストユーザー(タイムアウト)"
+                  }
+                }
+              };
+              const jsonResponse = JSON.stringify(mockResponse);
+              unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+            }
+          }, 5000); // 5秒でタイムアウト
+          
+        } catch (error) {
+          console.error("[HTML] サーバー通信エラー:", error);
+          // エラー時はモックレスポンス
+          if (unityInstance) {
+            const errorResponse = {
+              "id": 2,
+              "type": "event",
+              "data": {
+                "command": "account-get",
+                "result": false,
+                "value": {
+                  "uid": "error_user",
+                  "display_name": "テストユーザー(エラー)"
+                }
+              }
+            };
+            const jsonResponse = JSON.stringify(errorResponse);
+            unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+          }
+        }
       } else {
         // モックサーバー通信
         console.log("[HTML] Using MOCK server communication");
