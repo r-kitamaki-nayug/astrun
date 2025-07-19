@@ -51,6 +51,9 @@
       }
     };
     
+    // 実際のサーバー通信フラグ
+    let useRealServer = true; // trueにすると実際のサーバー通信
+    
     // 文字化けを防ぐためのUTF-8エンコーディング確認
     console.log("[HTML] UTF-8 encoding test: テストユーザー");
     console.log("[HTML] Character encoding:", document.characterSet);
@@ -59,25 +62,34 @@
       console.log("[HTML] TG_featureAccountGet called");
       console.log("[HTML] Sending request to server...");
       
-      // リクエストを送信
-      const request = TG.featureAccountGet();
-      console.log("[HTML] Request data:", request);
-      
-      // サーバーからの応答をシミュレート（実際のサーバー通信に置き換える）
-      setTimeout(() => {
-        console.log("[HTML] Simulating server response...");
-        const response = mockServerResponse;
-        console.log("[HTML] Server response:", response);
+      if (useRealServer) {
+        // 実際のサーバー通信
+        console.log("[HTML] Using REAL server communication");
+        const request = TG.featureAccountGet();
+        console.log("[HTML] Real request data:", request);
+        window.postMessage(request, "*");
+      } else {
+        // モックサーバー通信
+        console.log("[HTML] Using MOCK server communication");
+        const request = TG.featureAccountGet();
+        console.log("[HTML] Mock request data:", request);
         
-        // Unityにレスポンスを送信
-        if (unityInstance) {
-          const jsonResponse = JSON.stringify(response);
-          console.log("[HTML] Sending response to Unity:", jsonResponse);
-          unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
-        } else {
-          console.warn("[HTML] Unity instance not ready yet");
-        }
-      }, 1000); // 1秒後にレスポンス
+        // サーバーからの応答をシミュレート
+        setTimeout(() => {
+          console.log("[HTML] Simulating server response...");
+          const response = mockServerResponse;
+          console.log("[HTML] Mock server response:", response);
+          
+          // Unityにレスポンスを送信
+          if (unityInstance) {
+            const jsonResponse = JSON.stringify(response);
+            console.log("[HTML] Sending mock response to Unity:", jsonResponse);
+            unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+          } else {
+            console.warn("[HTML] Unity instance not ready yet");
+          }
+        }, 1000); // 1秒後にレスポンス
+      }
     };
 
     window.TG_featureAccountSignIn = () => {
@@ -114,19 +126,19 @@
 
     // メッセージ受信処理を改善
     window.addEventListener("message", (e) => {
-      console.log("[HTML] Message received from server:", e.data);
+      console.log("[HTML] REAL server message received:", e.data);
       const json = JSON.stringify(e.data);
-      console.log("[HTML] JSON stringified:", json);
+      console.log("[HTML] Real server JSON stringified:", json);
       
       if (unityInstance) {
-        console.log("[HTML] Sending message to Unity");
+        console.log("[HTML] Sending REAL server message to Unity");
         unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
       } else {
-        console.warn("[HTML] Unity instance not ready yet, message queued");
+        console.warn("[HTML] Unity instance not ready yet, real server message queued");
         // Unityが準備できていない場合は少し待ってから再試行
         setTimeout(() => {
           if (unityInstance) {
-            console.log("[HTML] Retrying to send message to Unity");
+            console.log("[HTML] Retrying to send REAL server message to Unity");
             unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
           } else {
             console.error("[HTML] Unity instance still not ready after retry");
