@@ -45,124 +45,49 @@
     import * as TG from "./tbs-game.js";
 
     console.log("[HTML] TG module loaded:", TG);
-    console.log("[HTML] Available TG functions:", Object.keys(TG));
 
-    // サーバー通信のモック実装を追加
-    let mockServerResponse = {
-      "id": 2,
-      "type": "event",
-      "data": {
-        "command": "account-get",
-        "result": true,
-        "value": {
-          "uid": "mock_user_123",
-          "display_name": "テストユーザー"
-        }
-      }
-    };
-    
-    // 実際のサーバー通信フラグ
+    // サーバー通信フラグ
     let useRealServer = true; // trueにすると実際のサーバー通信
-    
-    // 文字化けを防ぐためのUTF-8エンコーディング確認
-    console.log("[HTML] UTF-8 encoding test: テストユーザー");
-    console.log("[HTML] Character encoding:", document.characterSet);
 
+    // アカウント情報取得
     window.TG_featureAccountGet = () => {
       console.log("[HTML] TG_featureAccountGet called");
-      console.log("[HTML] Sending request to server...");
       
       if (useRealServer) {
-        // 実際のサーバー通信（iframe通信対応）
-        console.log("[HTML] Using REAL server communication (iframe mode)");
         const request = TG.featureAccountGet();
-        console.log("[HTML] Real request data:", request);
+        console.log("[HTML] Account request:", request);
         
-        // iframe通信の仕組みに従って親ウィンドウにメッセージを送信
-        try {
-          console.log("[HTML] iframe内から親ウィンドウにメッセージ送信中...");
-          console.log("[HTML] リクエスト詳細:", JSON.stringify(request, null, 2));
-          
-          // iframe内から親ウィンドウにメッセージを送信
-          if (window.parent && window.parent !== window) {
-            console.log("[HTML] iframe内から親ウィンドウにメッセージ送信");
-            window.parent.postMessage(request, "*");
-          } else {
-            console.log("[HTML] 通常のウィンドウ - 自分自身にメッセージ送信");
-            window.postMessage(request, "*");
-          }
-          
-          console.log("[HTML] 親ウィンドウへのメッセージ送信完了 - サーバー応答を待機中...");
-          
-        } catch (error) {
-          console.error("[HTML] iframe通信エラー:", error);
-          // エラー時はモックレスポンス
-          if (unityInstance) {
-            const errorResponse = {
-              "id": 2,
-              "type": "event",
-              "data": {
-                "command": "account-get",
-                "result": false,
-                "value": {
-                  "uid": "error_user",
-                  "display_name": "テストユーザー(エラー)"
-                }
-              }
-            };
-            const jsonResponse = JSON.stringify(errorResponse);
-            unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
-          }
+        // iframe内から親ウィンドウにメッセージを送信
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(request, "*");
+        } else {
+          window.postMessage(request, "*");
         }
-      } else {
-        // モックサーバー通信
-        console.log("[HTML] Using MOCK server communication");
-        const request = TG.featureAccountGet();
-        console.log("[HTML] Mock request data:", request);
-        
-        // サーバーからの応答をシミュレート
-        setTimeout(() => {
-          console.log("[HTML] Simulating server response...");
-          const response = mockServerResponse;
-          console.log("[HTML] Mock server response:", response);
-          
-          // Unityにレスポンスを送信
-          if (unityInstance) {
-            const jsonResponse = JSON.stringify(response);
-            console.log("[HTML] Sending mock response to Unity:", jsonResponse);
-            unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
-          } else {
-            console.warn("[HTML] Unity instance not ready yet");
-          }
-        }, 1000); // 1秒後にレスポンス
       }
     };
 
+    // サインイン（手動実行のみ）
     window.TG_featureAccountSignIn = () => {
       console.log("[HTML] TG_featureAccountSignIn called");
       const request = TG.featureAccountSignIn();
       console.log("[HTML] SignIn request:", request);
       
-      // iframe通信の仕組みに従って親ウィンドウにメッセージを送信
+      // iframe内から親ウィンドウにメッセージを送信
       if (window.parent && window.parent !== window) {
-        console.log("[HTML] iframe内から親ウィンドウにサインインリクエスト送信");
         window.parent.postMessage(request, "*");
       } else {
-        console.log("[HTML] 通常のウィンドウ - 自分自身にサインインリクエスト送信");
         window.postMessage(request, "*");
       }
     };
 
+    // ランキング関連（必要に応じて）
     window.TG_featureRankingGetList = () => {
-      console.log("[HTML] TG_featureRankingGetList called");
       const request = TG.featureRankingGetList({
         category: "total",
         limit: 10,
         offset: 0,
       });
-      console.log("[HTML] Ranking request:", request);
       
-      // iframe通信対応
       if (window.parent && window.parent !== window) {
         window.parent.postMessage(request, "*");
       } else {
@@ -171,11 +96,8 @@
     };
 
     window.TG_featureRankingGetMy = () => {
-      console.log("[HTML] TG_featureRankingGetMy called");
       const request = TG.featureRankingGetMy();
-      console.log("[HTML] My ranking request:", request);
       
-      // iframe通信対応
       if (window.parent && window.parent !== window) {
         window.parent.postMessage(request, "*");
       } else {
@@ -184,11 +106,8 @@
     };
 
     window.TG_featureRankingPost = (score) => {
-      console.log("[HTML] TG_featureRankingPost called with score:", score);
       const request = TG.featureRankingPost({ score: Number(score) });
-      console.log("[HTML] Score post request:", request);
       
-      // iframe通信対応
       if (window.parent && window.parent !== window) {
         window.parent.postMessage(request, "*");
       } else {
@@ -196,136 +115,60 @@
       }
     };
 
-    // メッセージ受信処理を改善（iframe通信対応）
+    // メッセージ受信処理
     window.addEventListener("message", (e) => {
-      console.log("[HTML] === サーバーからのレスポンス ===");
-      console.log("[HTML] 受信データ:", JSON.stringify(e.data, null, 2));
+      console.log("[HTML] サーバーからのレスポンス:", e.data);
       
-      // 開発者提案の形式でデータを処理
       const d = e.data;
       if (d && d.type === TG.Type.Event) {
-        console.log("[HTML] 有効なイベントデータを受信");
-        
         switch (d.data.command) {
           case TG.EventType.State.Ready: {
-            console.log("[HTML] 状態: 認証済み");
-            console.log("[HTML] Platform is ready, requesting account data...");
-            // State.Readyが受信されたら自動でアカウント取得を実行
-            if (window.TG_featureAccountGet) {
-              setTimeout(() => {
-                console.log("[HTML] Executing TG_featureAccountGet after State.Ready");
-                window.TG_featureAccountGet();
-              }, 100);
-            }
-            return; // 処理完了
+            console.log("[HTML] プラットフォーム準備完了");
+            // 準備完了時は何もしない（Unity側で必要に応じてアカウント取得）
+            return;
           }
           case TG.EventType.State.NotReady: {
-            console.log("[HTML] 状態: 未認証");
-            console.log("[HTML] サインインが必要です");
-            // State.NotReadyの場合はサインインを実行
-            if (window.TG_featureAccountSignIn) {
-              setTimeout(() => {
-                console.log("[HTML] Executing TG_featureAccountSignIn");
-                window.TG_featureAccountSignIn();
-              }, 100);
-            } else {
-              console.error("[HTML] TG_featureAccountSignIn function not found");
-            }
-            return; // 処理完了
+            console.log("[HTML] プラットフォーム未準備 - サインインが必要");
+            // 自動サインインは実行しない（手動実行のみ）
+            return;
           }
           case TG.EventType.Account.Get: {
-            console.log("[HTML] アカウントデータを受信:", d.data.value);
             const value = d.data.value;
             if (value && value.result) {
-              console.log("[HTML] アカウント取得成功:");
-              console.log("[HTML]   UID:", value.uid);
-              console.log("[HTML]   表示名:", value.display_name);
+              console.log("[HTML] アカウント取得成功:", value.display_name);
               
-              // アカウントデータを受信したらUnityに送信してゲーム開始
-              if (unityInstance && value.display_name) {
-                console.log("[HTML] ユーザー情報取得成功 - ゲーム開始準備完了");
+              // Unityにアカウントデータを送信
+              if (unityInstance) {
                 const jsonResponse = JSON.stringify(d);
-                console.log("[HTML] Sending REAL account data to Unity:", jsonResponse);
                 unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
-                return; // 処理完了
               }
             } else {
               console.log("[HTML] アカウント取得失敗");
-              console.log("[HTML]   エラー:", value ? value.message : '不明なエラー');
-              console.log("[HTML] サインインが必要です");
             }
-            break;
-          }
-          default: {
-            console.log("[HTML] その他のイベント:", d.data.command);
-            break;
+            return;
           }
         }
-        
-        // 実サーバーからの正しい応答なので、後続の既存処理はスキップ
-        console.log("[HTML] Real server response processed, skipping legacy handling");
-        return;
       }
       
-      // 既存の処理も維持（後方互換性のため）
-      console.log("[HTML] Legacy message processing...");
-      console.log("[HTML] Message type:", typeof e.data);
-      console.log("[HTML] Message structure:", JSON.stringify(e.data, null, 2));
-      
-      const json = JSON.stringify(e.data);
-      console.log("[HTML] Legacy JSON stringified:", json);
-      
-      // Unityに送信する前にデータ形式を確認
-      if (e.data && e.data.type && e.data.data) {
-        console.log("[HTML] Valid message structure detected");
-        if (unityInstance) {
-          console.log("[HTML] Sending legacy message to Unity");
-          unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
-        } else {
-          console.warn("[HTML] Unity instance not ready yet, legacy message queued");
-          setTimeout(() => {
-            if (unityInstance) {
-              console.log("[HTML] Retrying to send legacy message to Unity");
-              unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
-            } else {
-              console.error("[HTML] Unity instance still not ready after retry");
-            }
-          }, 1000);
-        }
-      } else {
-        console.warn("[HTML] Invalid message structure, skipping Unity transmission");
+      // その他のメッセージはUnityに転送
+      if (unityInstance && e.data) {
+        const json = JSON.stringify(e.data);
+        unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
       }
     });
 
-    // エラーハンドリングを追加
+    // エラーハンドリング
     window.addEventListener("error", (e) => {
       console.error("[HTML] JavaScript error:", e.error);
     });
 
-    // ページ読み込み完了時のログ
+    // 初期化
     window.addEventListener("load", () => {
-      console.log("[HTML] Page loaded, TG functions available:", {
-        featureAccountGet: typeof window.TG_featureAccountGet,
-        featureAccountSignIn: typeof window.TG_featureAccountSignIn,
-        featureRankingGetList: typeof window.TG_featureRankingGetList,
-        featureRankingGetMy: typeof window.TG_featureRankingGetMy,
-        featureRankingPost: typeof window.TG_featureRankingPost
-      });
+      console.log("[HTML] Page loaded, iframe通信準備完了");
+      console.log("[HTML] 親ウィンドウ存在:", window.parent !== window);
       
-      // iframe通信の初期化
-      console.log("[HTML] iframe通信初期化完了");
-      console.log("[HTML] 親ウィンドウ存在確認:", window.parent !== window);
-      
-      // ページ読み込み完了後、まずユーザー情報を取得を試行
-      console.log("[HTML] Initiating account data retrieval on page load");
-      setTimeout(() => {
-        if (window.TG_featureAccountGet) {
-          console.log("[HTML] Executing initial TG_featureAccountGet");
-          window.TG_featureAccountGet();
-        } else {
-          console.error("[HTML] TG_featureAccountGet not available on page load");
-        }
-      }, 1000); // Unity初期化を待ってから実行
+      // Unity側で必要に応じてアカウント取得を実行するため、
+      // ここでは自動実行しない
     });
   </script>
 </body>
