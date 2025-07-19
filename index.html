@@ -137,22 +137,61 @@
     };
 
     window.TG_featureRankingGetMy = () => {
-      const request = TG.featureRankingGetMy();
+      console.log("[HTML] TG_featureRankingGetMy called");
+      console.log("[HTML] Mode:", useRealServer ? "Real Server" : "Local Mock");
       
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(request, "*");
+      if (useRealServer) {
+        const request = TG.featureRankingGetMy();
+        console.log("[HTML] My ranking request:", request);
+        
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(request, "*");
+        } else {
+          window.postMessage(request, "*");
+        }
       } else {
-        window.postMessage(request, "*");
+        // ローカルモック: 自分のハイスコアをシミュレート
+        console.log("[HTML] [MOCK] 自分のハイスコア取得をシミュレート");
+        setTimeout(() => {
+          const mockHighScore = Math.floor(Math.random() * 3000) + 1000; // 10.00～40.00秒相当
+          const mockResponse = createMockResponse(TG.EventType.Ranking.GetMy, true, {
+            uid: mockUserData.uid,
+            display_name: mockUserData.display_name,
+            score: mockHighScore,
+            rank: Math.floor(Math.random() * 50) + 1,
+            updated_at: new Date().toISOString()
+          });
+          console.log("[HTML] [MOCK] 自分のハイスコア:", mockHighScore, "（", (mockHighScore/100).toFixed(2), "秒相当）");
+          window.dispatchEvent(new MessageEvent('message', { data: mockResponse }));
+        }, 400); // 0.4秒後にレスポンス
       }
     };
 
     window.TG_featureRankingPost = (score) => {
-      const request = TG.featureRankingPost({ score: Number(score) });
+      console.log("[HTML] TG_featureRankingPost called with score:", score);
+      console.log("[HTML] Mode:", useRealServer ? "Real Server" : "Local Mock");
       
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage(request, "*");
+      if (useRealServer) {
+        const request = TG.featureRankingPost({ score: Number(score) });
+        console.log("[HTML] Ranking post request:", request);
+        
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(request, "*");
+        } else {
+          window.postMessage(request, "*");
+        }
       } else {
-        window.postMessage(request, "*");
+        // ローカルモック: スコア送信成功をシミュレート
+        console.log("[HTML] [MOCK] スコア送信をシミュレート - スコア:", score);
+        setTimeout(() => {
+          const mockResponse = createMockResponse(TG.EventType.Ranking.Post, true, {
+            score: Number(score),
+            rank: Math.floor(Math.random() * 10) + 1, // ランダムな順位
+            submitted_at: new Date().toISOString()
+          });
+          console.log("[HTML] [MOCK] スコア送信成功:", mockResponse);
+          window.dispatchEvent(new MessageEvent('message', { data: mockResponse }));
+        }, 300); // 0.3秒後にレスポンス
       }
     };
 
@@ -208,6 +247,30 @@
                 userInfo = null;
                 notifyUnityLoginStatus(false);
               }
+            }
+            return;
+          }
+          case TG.EventType.Ranking.Post: {
+            const value = d.data.value;
+            console.log("[HTML] ランキング投稿結果:", value);
+            
+            // Unityにスコア投稿結果を通知
+            if (unityInstance) {
+              const jsonResponse = JSON.stringify(d);
+              console.log("[HTML] Unityにスコア投稿結果を送信:", jsonResponse);
+              unityInstance.SendMessage("GamePlatform", "OnScoreSubmitted", jsonResponse);
+            }
+            return;
+          }
+          case TG.EventType.Ranking.GetMy: {
+            const value = d.data.value;
+            console.log("[HTML] 自分のハイスコア取得結果:", value);
+            
+            // Unityにハイスコア取得結果を通知
+            if (unityInstance) {
+              const jsonResponse = JSON.stringify(d);
+              console.log("[HTML] Unityにハイスコア取得結果を送信:", jsonResponse);
+              unityInstance.SendMessage("GamePlatform", "OnHighScoreReceived", jsonResponse);
             }
             return;
           }
