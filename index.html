@@ -1,6 +1,16 @@
-<!-- UNITY_WEBGL_TEMPLATE -->
-<!DOCTYPE html>
-<html lang="en">
+  <!-- UNITY_WEBGL_TEMPLATE -->
+  
+  <!--
+  ■iframe通信の仕組み
+  
+  1. iframe内のゲームが featureAccountGet() でリクエスト作成
+  2. window.parent.postMessage() で親ウィンドウ（プラットフォーム側）に送信
+  3. 親ウィンドウがサーバー通信を行い、レスポンスを作成
+  4. 親ウィンドウから iframe.contentWindow.postMessage() でゲームにレスポンス送信 
+  -->
+  
+  <!DOCTYPE html>
+  <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>GamePlatform WebGL</title>
@@ -63,41 +73,29 @@
       console.log("[HTML] Sending request to server...");
       
       if (useRealServer) {
-        // 実際のサーバー通信
-        console.log("[HTML] Using REAL server communication");
+        // 実際のサーバー通信（iframe通信対応）
+        console.log("[HTML] Using REAL server communication (iframe mode)");
         const request = TG.featureAccountGet();
         console.log("[HTML] Real request data:", request);
         
-        // 実際のサーバー通信を実行
+        // iframe通信の仕組みに従って親ウィンドウにメッセージを送信
         try {
-          console.log("[HTML] 実際のサーバーにリクエストを送信中...");
+          console.log("[HTML] iframe内から親ウィンドウにメッセージ送信中...");
           console.log("[HTML] リクエスト詳細:", JSON.stringify(request, null, 2));
-          window.postMessage(request, "*");
           
-          // タイムアウト処理を無効化（実サーバー応答を優先）
-          // setTimeout(() => {
-          //   console.log("[HTML] サーバー応答タイムアウト - モックレスポンスにフォールバック");
-          //   console.log("[HTML] タイムアウト理由: サーバー側のTypeScriptコードが応答を処理していない可能性");
-          //   if (unityInstance) {
-          //     const mockResponse = {
-          //       "id": 2,
-          //       "type": "event",
-          //       "data": {
-          //         "command": "account-get",
-          //         "result": true,
-          //         "value": {
-          //           "uid": "real_user_123",
-          //           "display_name": "テストユーザー(タイムアウト)"
-          //         }
-          //       }
-          //     };
-          //     const jsonResponse = JSON.stringify(mockResponse);
-          //     unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
-          //   }
-          // }, 5000); // タイムアウトを無効化
+          // iframe内から親ウィンドウにメッセージを送信
+          if (window.parent && window.parent !== window) {
+            console.log("[HTML] iframe内から親ウィンドウにメッセージ送信");
+            window.parent.postMessage(request, "*");
+          } else {
+            console.log("[HTML] 通常のウィンドウ - 自分自身にメッセージ送信");
+            window.postMessage(request, "*");
+          }
+          
+          console.log("[HTML] 親ウィンドウへのメッセージ送信完了 - サーバー応答を待機中...");
           
         } catch (error) {
-          console.error("[HTML] サーバー通信エラー:", error);
+          console.error("[HTML] iframe通信エラー:", error);
           // エラー時はモックレスポンス
           if (unityInstance) {
             const errorResponse = {
@@ -144,7 +142,15 @@
       console.log("[HTML] TG_featureAccountSignIn called");
       const request = TG.featureAccountSignIn();
       console.log("[HTML] SignIn request:", request);
-      window.postMessage(request, "*");
+      
+      // iframe通信の仕組みに従って親ウィンドウにメッセージを送信
+      if (window.parent && window.parent !== window) {
+        console.log("[HTML] iframe内から親ウィンドウにサインインリクエスト送信");
+        window.parent.postMessage(request, "*");
+      } else {
+        console.log("[HTML] 通常のウィンドウ - 自分自身にサインインリクエスト送信");
+        window.postMessage(request, "*");
+      }
     };
 
     window.TG_featureRankingGetList = () => {
@@ -155,47 +161,66 @@
         offset: 0,
       });
       console.log("[HTML] Ranking request:", request);
-      window.postMessage(request, "*");
+      
+      // iframe通信対応
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(request, "*");
+      } else {
+        window.postMessage(request, "*");
+      }
     };
 
     window.TG_featureRankingGetMy = () => {
       console.log("[HTML] TG_featureRankingGetMy called");
       const request = TG.featureRankingGetMy();
       console.log("[HTML] My ranking request:", request);
-      window.postMessage(request, "*");
+      
+      // iframe通信対応
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(request, "*");
+      } else {
+        window.postMessage(request, "*");
+      }
     };
 
     window.TG_featureRankingPost = (score) => {
       console.log("[HTML] TG_featureRankingPost called with score:", score);
       const request = TG.featureRankingPost({ score: Number(score) });
       console.log("[HTML] Score post request:", request);
-      window.postMessage(request, "*");
+      
+      // iframe通信対応
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(request, "*");
+      } else {
+        window.postMessage(request, "*");
+      }
     };
 
-    // メッセージ受信処理を改善（開発者提案のイベントリスナーを追加）
+    // メッセージ受信処理を改善（iframe通信対応）
     window.addEventListener("message", (e) => {
-      console.log("[HTML] REAL server message received:", e.data);
+      console.log("[HTML] === サーバーからのレスポンス ===");
+      console.log("[HTML] 受信データ:", JSON.stringify(e.data, null, 2));
       
       // 開発者提案の形式でデータを処理
       const d = e.data;
-      if (d && d.type == TG.Type.Event) {
-        // プラットフォームから取得したイベントをログに書き出す
-        console.log("[Game]", "Received data from platform:", d);
+      if (d && d.type === TG.Type.Event) {
+        console.log("[HTML] 有効なイベントデータを受信");
         
         switch (d.data.command) {
           case TG.EventType.State.Ready: {
-            console.log("Authenticated account data received.");
-            // State.Readyが受信されたら自動でアカウント取得を実行
+            console.log("[HTML] 状態: 認証済み");
             console.log("[HTML] Platform is ready, requesting account data...");
+            // State.Readyが受信されたら自動でアカウント取得を実行
             if (window.TG_featureAccountGet) {
               setTimeout(() => {
+                console.log("[HTML] Executing TG_featureAccountGet after State.Ready");
                 window.TG_featureAccountGet();
-              }, 100); // 少し遅延を入れて確実に実行
+              }, 100);
             }
             return; // 処理完了
           }
           case TG.EventType.State.NotReady: {
-            console.warn("No authenticated account data received.");
+            console.log("[HTML] 状態: 未認証");
             console.log("[HTML] Platform not ready, attempting sign-in...");
             // State.NotReadyの場合はサインインを実行
             if (window.TG_featureAccountSignIn) {
@@ -209,20 +234,29 @@
             return; // 処理完了
           }
           case TG.EventType.Account.Get: {
-            console.log("[Game] Account data received:", d.data.value);
-            // アカウントデータを受信したらUnityに送信
-            if (unityInstance && d.data.value && d.data.value.display_name) {
-              console.log("[HTML] Real server account data detected, sending to Unity");
-              console.log("[HTML] Display name:", d.data.value.display_name);
-              const jsonResponse = JSON.stringify(d);
-              console.log("[HTML] Sending REAL account data to Unity:", jsonResponse);
-              unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
-              return; // 処理完了なので後続処理をスキップ
+            console.log("[HTML] アカウントデータを受信:", d.data.value);
+            const value = d.data.value;
+            if (value && value.result) {
+              console.log("[HTML] アカウント取得成功:");
+              console.log("[HTML]   UID:", value.uid);
+              console.log("[HTML]   表示名:", value.display_name);
+              
+              // アカウントデータを受信したらUnityに送信
+              if (unityInstance && value.display_name) {
+                console.log("[HTML] Real server account data detected, sending to Unity");
+                const jsonResponse = JSON.stringify(d);
+                console.log("[HTML] Sending REAL account data to Unity:", jsonResponse);
+                unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+                return; // 処理完了
+              }
+            } else {
+              console.log("[HTML] アカウント取得失敗");
+              console.log("[HTML]   エラー:", value ? value.message : '不明なエラー');
             }
             break;
           }
           default: {
-            console.log("[Game] Other event received:", d.data.command);
+            console.log("[HTML] その他のイベント:", d.data.command);
             break;
           }
         }
@@ -233,25 +267,24 @@
       }
       
       // 既存の処理も維持（後方互換性のため）
-      // サーバー側のTypeScriptコードとの競合を避けるため、データを詳細にログ出力
+      console.log("[HTML] Legacy message processing...");
       console.log("[HTML] Message type:", typeof e.data);
       console.log("[HTML] Message structure:", JSON.stringify(e.data, null, 2));
       
       const json = JSON.stringify(e.data);
-      console.log("[HTML] Real server JSON stringified:", json);
+      console.log("[HTML] Legacy JSON stringified:", json);
       
       // Unityに送信する前にデータ形式を確認
       if (e.data && e.data.type && e.data.data) {
         console.log("[HTML] Valid message structure detected");
         if (unityInstance) {
-          console.log("[HTML] Sending REAL server message to Unity");
+          console.log("[HTML] Sending legacy message to Unity");
           unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
         } else {
-          console.warn("[HTML] Unity instance not ready yet, real server message queued");
-          // Unityが準備できていない場合は少し待ってから再試行
+          console.warn("[HTML] Unity instance not ready yet, legacy message queued");
           setTimeout(() => {
             if (unityInstance) {
-              console.log("[HTML] Retrying to send REAL server message to Unity");
+              console.log("[HTML] Retrying to send legacy message to Unity");
               unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
             } else {
               console.error("[HTML] Unity instance still not ready after retry");
@@ -277,6 +310,10 @@
         featureRankingGetMy: typeof window.TG_featureRankingGetMy,
         featureRankingPost: typeof window.TG_featureRankingPost
       });
+      
+      // iframe通信の初期化
+      console.log("[HTML] iframe通信初期化完了");
+      console.log("[HTML] 親ウィンドウ存在確認:", window.parent !== window);
       
       // ページ読み込み完了後、サインイン状態を確認するためにサインインを実行
       console.log("[HTML] Initiating sign-in process on page load");
