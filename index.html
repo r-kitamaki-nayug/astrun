@@ -14,7 +14,6 @@
   <canvas id="unity-canvas"></canvas>
   <script src="Build/astrun.loader.js"></script>
 
-
   <script>
     var unityInstance = null;
     createUnityInstance(document.querySelector("#unity-canvas"), {
@@ -27,38 +26,125 @@
       productVersion: "1.0",
     }).then((instance) => {
       unityInstance = instance;
+      console.log("[HTML] Unity instance created successfully");
+    }).catch((error) => {
+      console.error("[HTML] Unity instance creation failed:", error);
     });
   </script>
   <script type="module">
     import * as TG from "./tbs-game.js";
 
+    console.log("[HTML] TG module loaded:", TG);
+    console.log("[HTML] Available TG functions:", Object.keys(TG));
+
+    // サーバー通信のモック実装を追加
+    let mockServerResponse = {
+      "id": 2,
+      "type": "event",
+      "data": {
+        "command": "account-get",
+        "result": true,
+        "value": {
+          "uid": "mock_user_123",
+          "display_name": "テストユーザー"
+        }
+      }
+    };
+
     window.TG_featureAccountGet = () => {
-      window.postMessage(TG.featureAccountGet(), "*");
+      console.log("[HTML] TG_featureAccountGet called");
+      console.log("[HTML] Sending request to server...");
+      
+      // リクエストを送信
+      const request = TG.featureAccountGet();
+      console.log("[HTML] Request data:", request);
+      
+      // サーバーからの応答をシミュレート（実際のサーバー通信に置き換える）
+      setTimeout(() => {
+        console.log("[HTML] Simulating server response...");
+        const response = mockServerResponse;
+        console.log("[HTML] Server response:", response);
+        
+        // Unityにレスポンスを送信
+        if (unityInstance) {
+          const jsonResponse = JSON.stringify(response);
+          console.log("[HTML] Sending response to Unity:", jsonResponse);
+          unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", jsonResponse);
+        } else {
+          console.warn("[HTML] Unity instance not ready yet");
+        }
+      }, 1000); // 1秒後にレスポンス
     };
+
     window.TG_featureAccountSignIn = () => {
-      window.postMessage(TG.featureAccountSignIn(), "*");
+      console.log("[HTML] TG_featureAccountSignIn called");
+      const request = TG.featureAccountSignIn();
+      console.log("[HTML] SignIn request:", request);
+      window.postMessage(request, "*");
     };
+
     window.TG_featureRankingGetList = () => {
-      window.postMessage(TG.featureRankingGetList({
+      console.log("[HTML] TG_featureRankingGetList called");
+      const request = TG.featureRankingGetList({
         category: "total",
         limit: 10,
         offset: 0,
-      }), "*");
-    };
-    window.TG_featureRankingGetMy = () => {
-      window.postMessage(TG.featureRankingGetMy(), "*");
-    };
-    window.TG_featureRankingPost = (score) => {
-      window.postMessage(TG.featureRankingPost({ score: Number(score) }), "*");
+      });
+      console.log("[HTML] Ranking request:", request);
+      window.postMessage(request, "*");
     };
 
+    window.TG_featureRankingGetMy = () => {
+      console.log("[HTML] TG_featureRankingGetMy called");
+      const request = TG.featureRankingGetMy();
+      console.log("[HTML] My ranking request:", request);
+      window.postMessage(request, "*");
+    };
+
+    window.TG_featureRankingPost = (score) => {
+      console.log("[HTML] TG_featureRankingPost called with score:", score);
+      const request = TG.featureRankingPost({ score: Number(score) });
+      console.log("[HTML] Score post request:", request);
+      window.postMessage(request, "*");
+    };
+
+    // メッセージ受信処理を改善
     window.addEventListener("message", (e) => {
+      console.log("[HTML] Message received from server:", e.data);
       const json = JSON.stringify(e.data);
+      console.log("[HTML] JSON stringified:", json);
+      
       if (unityInstance) {
+        console.log("[HTML] Sending message to Unity");
         unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
       } else {
-        console.warn("Unity instance not ready yet");
+        console.warn("[HTML] Unity instance not ready yet, message queued");
+        // Unityが準備できていない場合は少し待ってから再試行
+        setTimeout(() => {
+          if (unityInstance) {
+            console.log("[HTML] Retrying to send message to Unity");
+            unityInstance.SendMessage("GamePlatform", "OnMessageFromPlatform", json);
+          } else {
+            console.error("[HTML] Unity instance still not ready after retry");
+          }
+        }, 1000);
       }
+    });
+
+    // エラーハンドリングを追加
+    window.addEventListener("error", (e) => {
+      console.error("[HTML] JavaScript error:", e.error);
+    });
+
+    // ページ読み込み完了時のログ
+    window.addEventListener("load", () => {
+      console.log("[HTML] Page loaded, TG functions available:", {
+        featureAccountGet: typeof window.TG_featureAccountGet,
+        featureAccountSignIn: typeof window.TG_featureAccountSignIn,
+        featureRankingGetList: typeof window.TG_featureRankingGetList,
+        featureRankingGetMy: typeof window.TG_featureRankingGetMy,
+        featureRankingPost: typeof window.TG_featureRankingPost
+      });
     });
   </script>
 </body>
