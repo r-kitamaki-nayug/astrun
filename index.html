@@ -50,6 +50,10 @@
         }
       }
     };
+    
+    // 文字化けを防ぐためのUTF-8エンコーディング確認
+    console.log("[HTML] UTF-8 encoding test: テストユーザー");
+    console.log("[HTML] Character encoding:", document.characterSet);
 
     window.TG_featureAccountGet = () => {
       console.log("[HTML] TG_featureAccountGet called");
