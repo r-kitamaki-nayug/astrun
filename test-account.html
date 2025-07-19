@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GamePlatform アカウント通信テスト</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+    button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .log { background: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 10px 0; height: 300px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; }
+    .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+    .status.success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+    .status.error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GamePlatform アカウント通信テスト</h1>
+    
+    <div class="controls">
+      <button onclick="testAccountGet()">アカウント情報取得</button>
+      <button onclick="testSignIn()">サインイン</button>
+      <button onclick="clearLog()">ログクリア</button>
+    </div>
+
+    <div id="status" class="status" style="display: none;"></div>
+    
+    <div class="log" id="log"></div>
+  </div>
+
+  <script type="module">
+    import * as TG from "./tbs-game.js";
+
+    // ログ表示用
+    function log(message) {
+      const logElement = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      logElement.textContent += `[${timestamp}] ${message}\n`;
+      logElement.scrollTop = logElement.scrollHeight;
+    }
+
+    function showStatus(message, isError = false) {
+      const statusElement = document.getElementById('status');
+      statusElement.textContent = message;
+      statusElement.className = `status ${isError ? 'error' : 'success'}`;
+      statusElement.style.display = 'block';
+    }
+
+    // グローバル関数として定義
+    window.testAccountGet = function() {
+      log("=== アカウント情報取得テスト開始 ===");
+      log("TG.featureAccountGet() を呼び出し中...");
+      
+      try {
+        const request = TG.featureAccountGet();
+        log(`リクエストデータ: ${JSON.stringify(request, null, 2)}`);
+        showStatus("アカウント情報取得リクエストを送信しました");
+      } catch (error) {
+        log(`エラー: ${error.message}`);
+        showStatus("アカウント情報取得に失敗しました", true);
+      }
+    };
+
+    window.testSignIn = function() {
+      log("=== サインインテスト開始 ===");
+      log("TG.featureAccountSignIn() を呼び出し中...");
+      
+      try {
+        const request = TG.featureAccountSignIn();
+        log(`リクエストデータ: ${JSON.stringify(request, null, 2)}`);
+        showStatus("サインインリクエストを送信しました");
+      } catch (error) {
+        log(`エラー: ${error.message}`);
+        showStatus("サインインに失敗しました", true);
+      }
+    };
+
+    window.clearLog = function() {
+      document.getElementById('log').textContent = '';
+      document.getElementById('status').style.display = 'none';
+    };
+
+    // プラットフォームからのメッセージを受信
+    window.addEventListener("message", (e) => {
+      log("=== サーバーからのレスポンス ===");
+      log(`受信データ: ${JSON.stringify(e.data, null, 2)}`);
+      
+      const d = e.data;
+      
+      if (d && d.type === TG.Type.Event) {
+        log("有効なイベントデータを受信");
+        
+        switch (d.data.command) {
+          case TG.EventType.State.Ready:
+            log("状態: 認証済み");
+            showStatus("プラットフォームは準備完了です");
+            break;
+            
+          case TG.EventType.State.NotReady:
+            log("状態: 未認証");
+            showStatus("サインインが必要です", true);
+            break;
+            
+          case TG.EventType.Account.Get:
+            const value = d.data.value;
+            if (value && value.result) {
+              log(`アカウント取得成功:`);
+              log(`  UID: ${value.uid}`);
+              log(`  表示名: ${value.display_name}`);
+              showStatus(`アカウント情報を取得しました: ${value.display_name}`);
+            } else {
+              log("アカウント取得失敗");
+              log(`  エラー: ${value ? value.message : '不明なエラー'}`);
+              showStatus("アカウント情報の取得に失敗しました", true);
+            }
+            break;
+            
+          default:
+            log(`その他のイベント: ${d.data.command}`);
+            break;
+        }
+      } else {
+        log("無効なデータ形式です");
+      }
+    });
+
+    // 初期化
+    log("GamePlatform アカウント通信テストが開始されました");
+    log("TGモジュール読み込み完了");
+    log(`利用可能な機能: ${Object.keys(TG).join(', ')}`);
+    
+    // 初回サインイン試行
+    setTimeout(() => {
+      log("=== 初期サインイン試行 ===");
+      testSignIn();
+    }, 1000);
+  </script>
+</body>
+</html>
